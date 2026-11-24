@@ -1,0 +1,90 @@
+name: CI - Proteção de Branch
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Linter HTML (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Verificar existência obrigatória do index.html na raiz
+        run: |
+          if [ ! -f "index.html" ]; then
+            echo "ERRO CRÍTICO: Arquivo index.html não encontrado na raiz do projeto."
+            exit 1
+          fi
+          echo "OK: index.html localizado na raiz."
+
+      - name: Configurar Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar HTMLHint (Linter)
+        run: npm run lint
+
+  quality-and-security:
+    name: Auditoria de Arquivos, Links e Conteúdo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Verificar existência obrigatória do index.html na raiz
+        run: |
+          if [ ! -f "index.html" ]; then
+            echo "ERRO CRÍTICO: Arquivo index.html não encontrado na raiz do projeto."
+            exit 1
+          fi
+
+      - name: Bloquear arquivos individuais maiores que 500KB
+        run: |
+          OVERSIZED=$(find . -path './.git' -prune -o -path './node_modules' -prune -o -type f -size +500k -print)
+          if [ -n "$OVERSIZED" ]; then
+            echo "ERRO: Arquivo(s) acima do limite de 500KB encontrado(s):"
+            echo "$OVERSIZED"
+            exit 1
+          fi
+          echo "OK: Nenhum arquivo ultrapassa 500KB."
+
+      - name: Varredura de comentários e termos sensíveis
+        run: |
+          MATCHES=$(grep -rnEi \
+            --exclude-dir=.git \
+            --exclude-dir=.github \
+            --exclude-dir=node_modules \
+            --exclude=package-lock.json \
+            '(TODO|FIXME|senha|password)' . || true)
+          if [ -n "$MATCHES" ]; then
+            echo "ERRO: Comentários pendentes ou termos sensíveis detectados:"
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "OK: Código limpo, sem pendências ou termos sensíveis."
+
+      - name: Configurar Node.js para checagem de links e imagens
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validar tags de link e imagem
+        run: npm run check:links

@@ -1,0 +1,70 @@
+name: CD - Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publicar no GitHub Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código aprovado da main
+        uses: actions/checkout@v4
+
+      - name: Preparar artefato estático de produção
+        run: |
+          mkdir -p _site
+          cp index.html style.css _site/
+          cp -r images _site/
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Enviar artefato para o Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Executar deploy no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  notify-failure:
+    name: Notificar falha no deploy por e-mail
+    needs: deploy
+    if: failure()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enviar e-mail de alerta via SMTP
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASS }}
+          subject: "Falha no Deploy - ${{ github.repository }}"
+          to: ${{ secrets.MAIL_TO }}
+          from: "GitHub Actions <${{ secrets.MAIL_USERNAME }}>"
+          body: |
+            O deploy do portfólio falhou na branch ${{ github.ref_name }}.
+            Autor: ${{ github.actor }}
+            Commit: ${{ github.sha }}
+            Execução: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

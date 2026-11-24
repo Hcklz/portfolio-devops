@@ -1,0 +1,13 @@
+{
+  "name": "portfolio-devops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portfólio profissional com esteira CI/CD no GitHub Actions",
+  "scripts": {
+    "lint": "htmlhint index.html",
+    "check:links": "node scripts/check-links.mjs"
+  },
+  "devDependencies": {
+    "htmlhint": "^1.1.4"
+  }
+}
