@@ -73,7 +73,7 @@ jobs:
             --exclude-dir=.github \
             --exclude-dir=node_modules \
             --exclude=package-lock.json \
-            '(TODO|FIXME|senha|password)' . || true)
+            '\b(TODO|FIXME)\b|senha|password' . || true)
           if [ -n "$MATCHES" ]; then
             echo "ERRO: Comentários pendentes ou termos sensíveis detectados:"
             echo "$MATCHES"
